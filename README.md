@@ -1,0 +1,5 @@
+- Give karma to users on command Rep+
+- Limit the number of rep given by a user per day (10)
+- Limit the amount of rep given to a user per post
+- Command that will reply with the table of logs of user. If you want to investigate a user
+- At midnight everyday the bot will post the rep logs of the whole day
