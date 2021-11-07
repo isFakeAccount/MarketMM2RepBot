@@ -9,7 +9,8 @@ import praw
 import prawcore
 import psycopg2
 import schedule
-from dotenv import load_dotenv
+
+import rep_manager
 
 
 def catch_exceptions(job_func):
@@ -35,6 +36,7 @@ def catch_exceptions(job_func):
 @catch_exceptions
 def submit_rep_transactions():
     print("Hello")
+    # TODO: Blah blah
 
 
 def logger_thread():
@@ -49,14 +51,14 @@ def logger_thread():
 
 
 @catch_exceptions
-def comment_listener(comment_stream, subreddit, reddit):
+def comment_listener(comment_stream):
     # Gets a continuous stream of comments
     for comment in comment_stream:
         if comment is None:
             break
         mutex = Lock()
         with mutex:
-            pass
+            rep_manager.load_comment(comment)
 
 
 def main_thread(*args):
@@ -69,7 +71,7 @@ def main_thread(*args):
     comment_stream = subreddit.stream.comments(pause_after=-1, skip_existing=True)
     while run_threads:
         try:
-            comment_listener(comment_stream, subreddit, args[0])
+            comment_listener(comment_stream)
         except StopIteration:
             comment_stream = subreddit.stream.comments(pause_after=-1, skip_existing=True)
 
@@ -77,17 +79,17 @@ def main_thread(*args):
 def main():
     global run_threads
 
-    DATABASE_URL = os.getenv('DATABASE_URL')
-    with closing(psycopg2.connect(DATABASE_URL, sslmode='require')) as db_conn:
+    with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
         with closing(db_conn.cursor()) as cursor:
             cursor.execute("""CREATE TABLE IF NOT EXISTS rep_transactions (comment_id TEXT,
-                                                                            comment_created_utc REAL,
+                                                                            comment_created_utc BIGINT,
                                                                             awarder TEXT,
-                                                                            awarder_rep INTEGER,
+                                                                            awarder_rep INT,
                                                                             awardee TEXT,
-                                                                            awardee_rep INTEGER,
+                                                                            awardee_rep INT,
+                                                                            delta_awardee_rep INT,
                                                                             submission_id TEXT,
-                                                                            submission_created_utc REAL,
+                                                                            submission_created_utc BIGINT,
                                                                             permalink TEXT)""")
             cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS comment_ID_index ON rep_transactions (comment_id)")
         db_conn.commit()
@@ -97,7 +99,7 @@ def main():
                          client_secret=os.getenv("client_secret"),
                          username=os.getenv("reddit_username"),
                          password=os.getenv("reddit_password"),
-                         user_agent=f"{platform.platform()}:MarketMM2Rep:1.0")
+                         user_agent=f"{platform.platform()}:MarketMM2Rep:1.0 (by u/is_fake_Account)")
     print(f"Account u/{reddit.user.me()} Logged In...")
     # Create threads
     main_thread_handler = Thread(target=main_thread, args=(reddit,))
@@ -120,5 +122,4 @@ def main():
 if __name__ == '__main__':
     run_threads = True
     failed_attempt = 1
-    load_dotenv()
     main()
