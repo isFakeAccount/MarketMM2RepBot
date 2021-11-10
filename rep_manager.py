@@ -43,6 +43,32 @@ def close_command(comment):
         bot_responses.close_submission_failed(comment, True)
 
 
+def rep_plus_mods(comment):
+    flair_functions.increment_rep(comment)
+    with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
+        with closing(db_conn.cursor()) as cursor:
+            comment.refresh()
+            cursor.execute("INSERT INTO rep_transactions VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                           (comment.id,
+                            comment.created_utc,
+                            comment.author.name,
+                            comment.author_flair_text.split()[-1],
+                            comment.parent().author.name,
+                            comment.parent().author_flair_text.split()[-1],
+                            1,
+                            comment.submission.id,
+                            comment.submission.created_utc,
+                            comment.permalink)
+                           )
+        db_conn.commit()
+        bot_responses.rep_rewarded_comment(comment)
+
+
+def rep_plus(comment):
+    # TODO: Implement the rep+ command for non-mod users
+    pass
+
+
 def load_comment(comment):
     """
     Loads the comment and if it a command, it executes the respective function
@@ -55,12 +81,15 @@ def load_comment(comment):
     # De-Escaping for fancy pants editor
     comment_body = comment.body.replace('\\', '')
     if re.match(CONSTANTS.REP_PLUS, comment_body, re.I):
-        pass
+        if is_mod(comment.author):
+            rep_plus_mods(comment)
+        else:
+            rep_plus(comment)
+
     elif re.match(CONSTANTS.CLOSE, comment_body, re.I):
         close_command(comment)
     elif re.match(CONSTANTS.REP_MINUS, comment_body, re.I):
         if is_mod(comment.author):
-            flair_functions.decrement_rep(comment)
             with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
                 with closing(db_conn.cursor()) as cursor:
                     comment.refresh()
@@ -77,5 +106,5 @@ def load_comment(comment):
                                     comment.permalink)
                                    )
                 db_conn.commit()
-
+            flair_functions.decrement_rep(comment)
             bot_responses.rep_subtract_comment(comment)

@@ -36,7 +36,7 @@ def catch_exceptions(job_func):
 @catch_exceptions
 def submit_rep_transactions():
     print("Hello")
-    # TODO: Blah blah
+    # TODO: Implement daily stats upload and cleaning excess rows function
 
 
 def logger_thread():

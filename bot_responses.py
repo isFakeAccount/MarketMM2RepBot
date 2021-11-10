@@ -65,3 +65,12 @@ def rep_subtract_comment(comment):
     """
     comment_body = get_comment_from_config(comment, 'subtract_rep_successful')
     reply(comment, comment_body)
+
+
+def rep_rewarded_comment(comment):
+    """
+    Replies with the comment for letting user know that the Reputation has been rewarded successfully
+    :param comment: The comment that triggered the command and will be replied to.
+    """
+    comment_body = get_comment_from_config(comment, 'reward_rep_successful')
+    reply(comment, comment_body)
