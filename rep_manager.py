@@ -181,3 +181,7 @@ def load_comment(comment):
                 db_conn.commit()
             flair_functions.decrement_rep(comment)
             bot_responses.rep_subtract_comment(comment)
+        elif re.match(CONSTANTS.MOD, comment_body, re.I):
+            mod_list = [f"u/{x.name}" for x in comment._reddit.subreddit("MarketMM2").moderator()]
+            bot_responses.mods_request_comment(comment, mod_list)
+

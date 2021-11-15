@@ -87,7 +87,7 @@ def incorrect_submission_type_comment(comment):
 
 def cannot_reward_yourself_comment(comment):
     """
-    Responds the user with message that the rep reward failed
+    Responds the user with comment that the rep reward failed
     :param comment: The comment that triggered the command and will be replied to.
     """
     comment_body = get_comment_from_config(comment, 'cannot_reward_yourself')
@@ -95,7 +95,7 @@ def cannot_reward_yourself_comment(comment):
 
 def deleted_or_removed_comment(comment):
     """
-    Responds the user with message that the rep reward failed
+    Responds the user with comment that the rep reward failed
     :param comment: The comment that triggered the command and will be replied to.
     """
     comment_body = get_comment_from_config(comment, 'removed_or_deleted')
@@ -103,7 +103,7 @@ def deleted_or_removed_comment(comment):
 
 def reward_limit_reached_comment(comment):
     """
-    Responds the user with message that the rep reward failed
+    Responds the user with comment that the rep reward failed
     :param comment: The comment that triggered the command and will be replied to.
     """
     comment_body = get_comment_from_config(comment, 'reward_limit_reached')
@@ -111,10 +111,17 @@ def reward_limit_reached_comment(comment):
 
 def cooldown_timer_reached_comment(comment):
     """
-    Responds the user with message that the rep reward failed
+    Responds the user with comment that the rep reward failed
     :param comment: The comment that triggered the command and will be replied to.
     """
     comment_body = get_comment_from_config(comment, 'cooldown_timer_reached')
     reply(comment, comment_body)
 
-
+def mods_request_comment(comment, mod_list):
+    """
+    Responds the user with comment that the moderators have been notified
+    :param comment: The comment that triggered the command and will be replied to.
+    """
+    comment_body = get_comment_from_config(comment, 'mods_requested')
+    comment_body = f"{comment_body} {', '.join(mod_list)}"
+    reply(comment, comment_body)

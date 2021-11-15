@@ -4,6 +4,7 @@ from enum import Enum
 REP_PLUS = r"(\++REP|REP\++)"
 REP_MINUS = r"(-+REP|REP-+)"
 CLOSE = r"(!CLOSE|CLOSE!)"
+MOD = r"(!MOD|MOD!)"
 
 # User Flairs
 REP_FLAIR_ID = '13e6e140-2b0c-11ec-8a70-0a847492ab37'
