@@ -182,7 +182,10 @@ def load_comment(comment):
             flair_functions.decrement_rep(comment)
             bot_responses.rep_subtract_comment(comment)
     elif re.match(CONSTANTS.MOD, comment_body, re.I):
-        if comment.submission.link_flair_text != 'Trade Offer':
-            mod_list = [f"u/{x.name}" for x in comment._reddit.subreddit("MarketMM2").moderator()]
+        if comment.submission.link_flair_text == 'Trade Offer':
+            mod_list = []
+            for moderator in comment._reddit.subreddit("MarketMM2").moderator():
+                if moderator.name != 'mm2repbot':
+                    mod_list.append(f"u/{moderator.name}")
             bot_responses.mods_request_comment(comment, mod_list)
 
