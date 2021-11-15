@@ -35,13 +35,13 @@ def catch_exceptions(job_func):
 
 @catch_exceptions
 def submit_rep_transactions():
-    print("Hello")
+    pass
     # TODO: Implement daily stats upload and cleaning excess rows function
 
 
 def logger_thread():
     """
-    The second thread that runs the logger function to upload everyday rep transactions
+    The second thread that runs the logger function to upload everyday rep transactions.
     """
     # Run schedule every week at midnight
     schedule.every().day.at("00:00").do(submit_rep_transactions)
@@ -63,8 +63,9 @@ def comment_listener(comment_stream):
 
 def main_thread(*args):
     """
-    Thread that runs the main program
-    :param args: Argument passed via Thread Module
+    Thread that runs the main program.
+
+    :param args: Argument passed via Thread Module.
     """
     # Gets 100 historical comments
     subreddit = args[0].subreddit("MarketMM2")

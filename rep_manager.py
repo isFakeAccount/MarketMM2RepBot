@@ -1,20 +1,23 @@
 import os
 import re
+import time
 from contextlib import closing
 
 import psycopg2
+import yaml
 
 import CONSTANTS
 import bot_responses
 import flair_functions
+from CONSTANTS import StatusCodes
 
 
 def is_mod(redditor) -> bool:
     """
-    Checks if the author is moderator or not
+    Checks if the author is moderator or not.
 
-    :param redditor: The reddit account instance
-    :return: True if author is moderator otherwise False
+    :param redditor: The reddit account instance.
+    :return: True if author is moderator otherwise False.
     """
     moderators_list = redditor._reddit.subreddit("MarketMM2").moderator()
     if redditor in moderators_list:
@@ -23,11 +26,19 @@ def is_mod(redditor) -> bool:
         return False
 
 
+def get_limits_from_config(limit_type, comment):
+    config = comment._reddit.subreddit("MarketMM2").wiki['marketmm2botsconfig/rep_bot_config'].content_md
+    for config in yaml.safe_load_all(config):
+        if config['type'] == 'limits':
+            return config[limit_type]
+    raise KeyError(f"{limit_type} Config not found")
+
+
 def close_command(comment):
     """
-    Performs checks if the submission can be closed
+    Performs checks if the submission can be closed.
 
-    :param comment: The comment object praw
+    :param comment: The comment object praw.
     """
     # Only OP can close the trade
     if comment.author == comment.submission.author or is_mod(comment.submission.author):
@@ -43,18 +54,34 @@ def close_command(comment):
         bot_responses.close_submission_failed(comment, True)
 
 
-def rep_plus_mods(comment):
+def increase_rep(comment):
     flair_functions.increment_rep(comment)
     with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
         with closing(db_conn.cursor()) as cursor:
+            marketmm2 = comment._reddit.subreddit("MarketMM2")
+            # If the user has no flair, assigns them flair. However since the flair takes time to apply
+            # .author_flair_text.split() will still throw an exception, hence it is manually set to zero
+            if not comment.author_flair_css_class:
+                marketmm2.flair.set(comment.author.name, text='Trade Rep: 0', flair_template_id=CONSTANTS.REP_FLAIR_ID)
+                awarder_rep = 0
+            else:
+                awarder_rep = comment.author_flair_text.split()[-1]
+
+            if not comment.parent().author_flair_css_class:
+                marketmm2.flair.set(comment.parent().author.name, text='Trade Rep: 0',
+                                    flair_template_id=CONSTANTS.REP_FLAIR_ID)
+                awardee_rep = 0
+            else:
+                awardee_rep = comment.parent().author_flair_text.split()[-1]
+
             comment.refresh()
             cursor.execute("INSERT INTO rep_transactions VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
                            (comment.id,
                             comment.created_utc,
                             comment.author.name,
-                            comment.author_flair_text.split()[-1],
+                            awarder_rep,
                             comment.parent().author.name,
-                            comment.parent().author_flair_text.split()[-1],
+                            awardee_rep,
                             1,
                             comment.submission.id,
                             comment.submission.created_utc,
@@ -64,16 +91,62 @@ def rep_plus_mods(comment):
         bot_responses.rep_rewarded_comment(comment)
 
 
-def rep_plus(comment):
-    # TODO: Implement the rep+ command for non-mod users
-    pass
+def checks_for_rep_command(comment):
+    if comment.submission.link_flair_text != 'Trade Offer':
+        bot_responses.incorrect_submission_type_comment(comment)
+        return StatusCodes.INCORRECT_SUBMISSION_TYPE
+
+    # Make sure author isn't rewarding themselves
+    if comment.author == comment.parent().author:
+        bot_responses.cannot_reward_yourself_comment(comment)
+        return StatusCodes.CANNOT_REWARD_YOURSELF
+
+    # If comment itself or the submission has been removed/deleted
+    removed_or_deleted = [not comment.removed,
+                          not comment.parent().removed,
+                          not not comment.parent().author,
+                          not comment.submission.removed,
+                          not not comment.submission.author]
+    if not all(removed_or_deleted):
+        bot_responses.deleted_or_removed_comment(comment)
+        return StatusCodes.DELETED_OR_REMOVED
+
+    with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
+        with closing(db_conn.cursor()) as cursor:
+            # Checking if user has not cross the general rep limit for the day
+            seconds_from_previous_midnight = time.localtime().tm_hour * 3600 + time.localtime().tm_min * 60 + \
+                                             time.localtime().tm_sec
+            unix_time_at_previous_midnight = time.time() - seconds_from_previous_midnight
+            cursor.execute("SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND comment_created_utc>=%s",
+                           (comment.author.name, unix_time_at_previous_midnight))
+            count = cursor.fetchone()[0]
+            if count >= get_limits_from_config('rep_limit_per_day', comment):
+                bot_responses.reward_limit_reached_comment(comment)
+                return StatusCodes.REP_AWARDING_LIMIT_REACHED
+
+            # checking if user is trying to gave rep to same user before rep cooldown expires
+            unix_time_30_mins_ago = time.time() - get_limits_from_config('rep_cooldown', comment) * 60
+            cursor.execute(
+                "SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND awardee=%s AND comment_created_utc>=%s",
+                (comment.author.name, comment.parent().author.name, unix_time_30_mins_ago))
+            count = cursor.fetchone()[0]
+            if count >= 1:
+                bot_responses.cooldown_timer_reached_comment(comment)
+                return StatusCodes.COOL_DOWN_TIMER
+
+    return StatusCodes.CHECKS_PASSED
+
+
+def process_rep_command(comment):
+    if checks_for_rep_command(comment) == StatusCodes.CHECKS_PASSED:
+        increase_rep(comment)
 
 
 def load_comment(comment):
     """
-    Loads the comment and if it a command, it executes the respective function
+    Loads the comment and if it a command, it executes the respective function.
 
-    :param comment: comment that is going to be checked
+    :param comment: comment that is going to be checked.
     """
     if comment.author.name == "AutoModerator":
         return None
@@ -82,9 +155,9 @@ def load_comment(comment):
     comment_body = comment.body.replace('\\', '')
     if re.match(CONSTANTS.REP_PLUS, comment_body, re.I):
         if is_mod(comment.author):
-            rep_plus_mods(comment)
+            increase_rep(comment)
         else:
-            rep_plus(comment)
+            process_rep_command(comment)
 
     elif re.match(CONSTANTS.CLOSE, comment_body, re.I):
         close_command(comment)
