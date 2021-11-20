@@ -5,6 +5,7 @@ REP_PLUS = r"(\++REP|REP\++)"
 REP_MINUS = r"(-+REP|REP-+)"
 CLOSE = r"(!CLOSE|CLOSE!)"
 MOD = r"(!MOD|MOD!)"
+REP_LOGS = r"!REPLOGS ([A-Za-z0-9_-]+) (\d+)"
 
 # User Flairs
 REP_FLAIR_ID = '13e6e140-2b0c-11ec-8a70-0a847492ab37'
