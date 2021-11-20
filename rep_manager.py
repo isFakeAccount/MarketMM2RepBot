@@ -92,7 +92,7 @@ def increase_rep(comment):
 
 
 def checks_for_rep_command(comment):
-    if re.match("Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
+    if not re.match("Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
         bot_responses.incorrect_submission_type_comment(comment)
         return StatusCodes.INCORRECT_SUBMISSION_TYPE
 
