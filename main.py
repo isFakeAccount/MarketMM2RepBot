@@ -34,17 +34,27 @@ def catch_exceptions(job_func):
 
 
 @catch_exceptions
-def submit_rep_transactions():
-    pass
-    # TODO: Implement daily stats upload and cleaning excess rows function
+def delete_old_rep_transactions():
+    """
+    Deletes the rep logs older than 6 months.
+    """
+    seconds_in_six_months = 180 * 60 * 60 * 24
+    unix_time_now = time.time()
+    unix_time_six_months_ago = unix_time_now - seconds_in_six_months
+    mutex = Lock()
+    with mutex:
+        with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
+            with closing(db_conn.cursor()) as cursor:
+                cursor.execute(f"DELETE FROM rep_transactions WHERE submission_created_utc <= '{unix_time_six_months_ago}'")
+            db_conn.commit()
 
 
-def logger_thread():
+def db_manager_thread():
     """
     The second thread that runs the logger function to upload everyday rep transactions.
     """
     # Run schedule every week at midnight
-    schedule.every().day.at("00:00").do(submit_rep_transactions)
+    schedule.every().day.at("00:00").do(delete_old_rep_transactions)
     while run_threads:
         schedule.run_pending()
         time.sleep(1)
@@ -104,18 +114,18 @@ def main():
     print(f"Account u/{reddit.user.me()} Logged In...")
     # Create threads
     main_thread_handler = Thread(target=main_thread, args=(reddit,))
-    logger_thread_handler = Thread(target=logger_thread)
+    db_manager_thread_handler = Thread(target=db_manager_thread)
     try:
         # run the threads
         main_thread_handler.start()
-        logger_thread_handler.start()
+        db_manager_thread_handler.start()
         print("Bot has now started!", time.strftime('%I:%M %p %Z'))
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         run_threads = False
         main_thread_handler.join()
-        logger_thread_handler.join()
+        db_manager_thread_handler.join()
         print("Bot has stopped!", time.strftime('%I:%M %p %Z'))
         quit()
 
