@@ -43,7 +43,7 @@ def close_command(comment):
     # Only OP can close the trade
     if comment.author == comment.submission.author or is_mod(comment.submission.author):
         # You can close trading posts only
-        if re.match("Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
+        if re.match(r"Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
             flair_functions.mark_submission_as_closed(comment.submission)
             bot_responses.close_submission_comment(comment)
         else:
@@ -92,7 +92,7 @@ def increase_rep(comment):
 
 
 def checks_for_rep_command(comment):
-    if not re.match("Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
+    if not re.match(r"Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
         bot_responses.incorrect_submission_type_comment(comment)
         return StatusCodes.INCORRECT_SUBMISSION_TYPE
 
@@ -182,13 +182,13 @@ def load_comment(comment):
             flair_functions.decrement_rep(comment)
             bot_responses.rep_subtract_comment(comment)
     elif re.match(CONSTANTS.MOD, comment_body, re.I):
-        if re.match("Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
+        if re.match(r"Trade\sOffer|Giveaway\sEntry", comment.submission.link_flair_text):
             mod_list = []
             for moderator in comment._reddit.subreddit("MarketMM2").moderator():
                 if moderator.name != 'mm2repbot':
                     mod_list.append(f"u/{moderator.name}")
             bot_responses.mods_request_comment(comment, mod_list)
-    elif regex_match:=re.match(CONSTANTS.REP_LOGS, comment_body, re.I):
+    elif regex_match := re.match(CONSTANTS.REP_LOGS, comment_body, re.I):
         if is_mod(comment.author):
             author_name = regex_match.group(1)
             days = regex_match.group(2)
@@ -196,4 +196,3 @@ def load_comment(comment):
                 redditor = comment._reddit.Redditor(author_name).name
             except AttributeError:
                 print("EEEEEEEEEEEEEEEEE")
-
