@@ -77,6 +77,7 @@ def rep_rewarded_comment(comment):
     comment_body = get_comment_from_config(comment, 'reward_rep_successful')
     reply(comment, comment_body)
 
+
 def incorrect_submission_type_comment(comment):
     """
     Responds the user with message that the rep reward failed
@@ -84,6 +85,7 @@ def incorrect_submission_type_comment(comment):
     """
     comment_body = get_comment_from_config(comment, 'incorrect_submission_type')
     reply(comment, comment_body)
+
 
 def cannot_reward_yourself_comment(comment):
     """
@@ -93,6 +95,7 @@ def cannot_reward_yourself_comment(comment):
     comment_body = get_comment_from_config(comment, 'cannot_reward_yourself')
     reply(comment, comment_body)
 
+
 def deleted_or_removed_comment(comment):
     """
     Responds the user with comment that the rep reward failed
@@ -100,6 +103,7 @@ def deleted_or_removed_comment(comment):
     """
     comment_body = get_comment_from_config(comment, 'removed_or_deleted')
     reply(comment, comment_body)
+
 
 def reward_limit_reached_comment(comment):
     """
@@ -109,6 +113,7 @@ def reward_limit_reached_comment(comment):
     comment_body = get_comment_from_config(comment, 'reward_limit_reached')
     reply(comment, comment_body)
 
+
 def cooldown_timer_reached_comment(comment):
     """
     Responds the user with comment that the rep reward failed
@@ -117,6 +122,7 @@ def cooldown_timer_reached_comment(comment):
     comment_body = get_comment_from_config(comment, 'cooldown_timer_reached')
     reply(comment, comment_body)
 
+
 def mods_request_comment(comment, mod_list):
     """
     Responds the user with comment that the moderators have been notified
@@ -124,4 +130,13 @@ def mods_request_comment(comment, mod_list):
     """
     comment_body = get_comment_from_config(comment, 'mods_requested')
     comment_body = f"{comment_body} {', '.join(mod_list)}"
+    reply(comment, comment_body)
+
+
+def giveway_limit_reached(comment):
+    """
+    Responds the user with comment when they have reached the max limit of rep that can be earned on single giveaway post
+    :param comment: The comment that triggered the command and will be replied to.
+    """
+    comment_body = get_comment_from_config(comment, 'giveway_limit_reached')
     reply(comment, comment_body)

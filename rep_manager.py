@@ -26,6 +26,16 @@ def is_mod(redditor) -> bool:
         return False
 
 
+def is_removed_or_deleted(content) -> bool:
+    """
+    Checks if comment, parent comment or submission has been removed/deleted. If it is deleted, the author is None.
+    If it is removed, the removed_by will have moderator name.
+    :param content: Reddit comment or submission
+    :return: True if the items is deleted or removed. Otherwise, False.
+    """
+    return content.author is None or content.mod_note or content.removed
+
+
 def get_limits_from_config(limit_type, comment):
     config = comment._reddit.subreddit("MarketMM2").wiki['marketmm2botsconfig/rep_bot_config'].content_md
     for config in yaml.safe_load_all(config):
@@ -102,37 +112,41 @@ def checks_for_rep_command(comment):
         return StatusCodes.CANNOT_REWARD_YOURSELF
 
     # If comment itself or the submission has been removed/deleted
-    removed_or_deleted = [not comment.removed,
-                          not comment.parent().removed,
-                          not not comment.parent().author,
-                          not comment.submission.removed,
-                          not not comment.submission.author]
-    if not all(removed_or_deleted):
+    removed_or_deleted = [comment, comment.parent(), comment.submission]
+    if any(map(is_removed_or_deleted, removed_or_deleted)):
         bot_responses.deleted_or_removed_comment(comment)
         return StatusCodes.DELETED_OR_REMOVED
 
     with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
         with closing(db_conn.cursor()) as cursor:
             # Checking if user has not cross the general rep limit for the day
-            seconds_from_previous_midnight = time.localtime().tm_hour * 3600 + time.localtime().tm_min * 60 + \
-                                             time.localtime().tm_sec
+            seconds_from_previous_midnight = time.localtime().tm_hour * 3600 + time.localtime().tm_min * 60 + time.localtime().tm_sec
             unix_time_at_previous_midnight = time.time() - seconds_from_previous_midnight
             cursor.execute("SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND comment_created_utc>=%s",
                            (comment.author.name, unix_time_at_previous_midnight))
             count = cursor.fetchone()[0]
-            if count >= get_limits_from_config('rep_limit_per_day', comment):
+            if count > get_limits_from_config('rep_limit_per_day', comment):
                 bot_responses.reward_limit_reached_comment(comment)
                 return StatusCodes.REP_AWARDING_LIMIT_REACHED
 
-            # checking if user is trying to gave rep to same user before rep cooldown expires
-            unix_time_30_mins_ago = time.time() - get_limits_from_config('rep_cooldown', comment) * 60
-            cursor.execute(
-                "SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND awardee=%s AND comment_created_utc>=%s",
-                (comment.author.name, comment.parent().author.name, unix_time_30_mins_ago))
+            # checking if user is trying to give rep to same user before rep cooldown expires
+            unix_time_30_min_ago = time.time() - get_limits_from_config('rep_cooldown', comment) * 60
+            cursor.execute("SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND awardee=%s AND comment_created_utc>=%s",
+                           (comment.author.name, comment.parent().author.name, unix_time_30_min_ago))
             count = cursor.fetchone()[0]
             if count >= 1:
                 bot_responses.cooldown_timer_reached_comment(comment)
                 return StatusCodes.COOL_DOWN_TIMER
+
+            if 'giveaway' in comment.submission.link_flair_text.lower():
+                # Checking how many rep has been awarded to the parent comment author on this giveaway submission.
+                cursor.execute("SELECT COUNT(*) FROM rep_transactions WHERE awardee=%s AND submission_id=%s",
+                               (comment.parent().author.name, comment.submission.id))
+                count = cursor.fetchone()[0]
+                # If limit is exceeded the rep is not rewarded.
+                if count > get_limits_from_config('giveaway_rep_limit_per_post', comment):
+                    bot_responses.giveway_limit_reached(comment)
+                    return StatusCodes.GIVEAWAY_LIMIT
 
     return StatusCodes.CHECKS_PASSED
 
@@ -144,7 +158,7 @@ def process_rep_command(comment):
 
 def load_comment(comment):
     """
-    Loads the comment and if it a command, it executes the respective function.
+    Loads the comment and if it is a command, it executes the respective function.
 
     :param comment: comment that is going to be checked.
     """
