@@ -125,7 +125,7 @@ def checks_for_rep_command(comment):
             cursor.execute("SELECT COUNT(*) FROM rep_transactions WHERE awarder=%s AND comment_created_utc>=%s",
                            (comment.author.name, unix_time_at_previous_midnight))
             count = cursor.fetchone()[0]
-            if count > get_limits_from_config('rep_limit_per_day', comment):
+            if count >= get_limits_from_config('rep_limit_per_day', comment):
                 bot_responses.reward_limit_reached_comment(comment)
                 return StatusCodes.REP_AWARDING_LIMIT_REACHED
 
@@ -144,7 +144,7 @@ def checks_for_rep_command(comment):
                                (comment.parent().author.name, comment.submission.id))
                 count = cursor.fetchone()[0]
                 # If limit is exceeded the rep is not rewarded.
-                if count > get_limits_from_config('giveaway_rep_limit_per_post', comment):
+                if count >= get_limits_from_config('giveaway_rep_limit_per_post', comment):
                     bot_responses.giveway_limit_reached(comment)
                     return StatusCodes.GIVEAWAY_LIMIT
 
