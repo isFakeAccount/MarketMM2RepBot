@@ -61,7 +61,7 @@ def delete_old_rep_transactions():
     with mutex:
         with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
             with closing(db_conn.cursor()) as cursor:
-                cursor.execute(f"DELETE FROM rep_transactions WHERE submission_created_utc <= '{unix_time_six_months_ago}'")
+                cursor.execute(f"DELETE FROM rep_transactions WHERE submission_created_utc <= '{int(unix_time_six_months_ago)}'")
             db_conn.commit()
 
 
