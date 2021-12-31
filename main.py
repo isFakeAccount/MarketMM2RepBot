@@ -1,16 +1,32 @@
+import json
 import os
 import platform
 import time
 import traceback
 from contextlib import closing
+from pprint import pprint
 from threading import Thread, Lock
 
 import praw
 import prawcore
 import psycopg2
+import requests
 import schedule
 
 import rep_manager
+
+
+def send_message_to_discord(msg):
+    """
+    Sends the message to discord channel via webhook url.
+    :param msg: message content.
+    """
+    data = {"content": msg, "username": "Karma Bot"}
+    output = requests.post(os.getenv('error_msg_channel'), data=json.dumps(data), headers={"Content-Type": "application/json"})
+    try:
+        output.raise_for_status()
+    except requests.HTTPError:
+        pprint(msg)
 
 
 def catch_exceptions(job_func):
@@ -20,7 +36,7 @@ def catch_exceptions(job_func):
             job_func(*args, **kwargs)
             failed_attempt = 1
         except Exception as exp:
-            traceback.print_exc()
+            send_message_to_discord(traceback.format_exc())
             # In case of server error pause for multiple of 5 minutes
             if isinstance(exp, (prawcore.exceptions.ServerError, prawcore.exceptions.RequestException)):
                 print(f"Waiting {(300 * failed_attempt) / 60} minutes...")
