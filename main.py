@@ -75,8 +75,15 @@ def delete_old_rep_transactions():
                 results = cursor.fetchall()
                 with closing(io.StringIO()) as str_buffer:
                     csv_writer = csv.writer(str_buffer)
-                    for row in results:
-                        csv_writer.writerow(row)
+                    csv_writer.writerow(['comment_id',
+                                         'comment_created_utc',
+                                         'awarder,awarder_rep',
+                                         'awardee,awardee_rep',
+                                         'delta_awardee_rep',
+                                         'submission_id',
+                                         'submission_created_utc',
+                                         'permalink'])
+                    csv_writer.writerows(results)
 
                     # Logging into Reddit
                     reddit = praw.Reddit(client_id=os.getenv("client_id"),
