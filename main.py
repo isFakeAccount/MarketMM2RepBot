@@ -160,6 +160,7 @@ def main():
                          password=os.getenv("reddit_password"),
                          user_agent=f"{platform.platform()}:MarketMM2Rep:1.0 (by u/is_fake_Account)")
     print(f"Account u/{reddit.user.me()} Logged In...")
+    reddit.validate_on_submit = True
     # Create threads
     main_thread_handler = Thread(target=main_thread, args=(reddit,))
     db_manager_thread_handler = Thread(target=db_manager_thread)

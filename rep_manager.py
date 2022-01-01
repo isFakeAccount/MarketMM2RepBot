@@ -205,8 +205,31 @@ def load_comment(comment):
     elif regex_match := re.match(CONSTANTS.REP_LOGS, comment_body, re.I):
         if is_mod(comment.author):
             author_name = regex_match.group(1)
-            days = regex_match.group(2)
+            days = int(regex_match.group(2))
+            unix_time_days_ago = time.time() - (min(days, 180) * 24 * 60 * 60)
             try:
-                redditor = comment._reddit.Redditor(author_name).name
+                redditor = comment._reddit.redditor(author_name).name
+                with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
+                    with closing(db_conn.cursor()) as cursor:
+                        cursor.execute(f"SELECT * FROM rep_transactions WHERE awarder='{redditor}' AND comment_created_utc >= '{int(unix_time_days_ago)}'")
+                        results = cursor.fetchall()
+                        table = "# Awarder Rep\n\n"
+                        table += "|comment_id|comment_created_utc|awarder|awarder_rep|awardee|awardee_rep|delta_awardee_rep|submission_id" \
+                                 "|submission_created_utc|permalink|\n|:-|:-|:-|:-|:-|:-|:-|:-|:-|:-|\n"
+                        for row in results:
+                            table += f"|{'|'.join(str(col) for col in row)}|\n"
+
+                        cursor.execute(f"SELECT * FROM rep_transactions WHERE awardee='{redditor}' AND comment_created_utc >= '{int(unix_time_days_ago)}'")
+                        results = cursor.fetchall()
+                        table += "\n# Awardee Karma\n\n"
+                        table += "|comment_id|comment_created_utc|awarder|awarder_rep|awardee|awardee_rep|delta_awardee_rep|submission_id" \
+                                 "|submission_created_utc|permalink|\n|:-|:-|:-|:-|:-|:-|:-|:-|:-|:-|\n"
+                        for row in results:
+                            table += f"|{'|'.join(str(col) for col in row)}|\n"
+
+                        title = f"{author_name} {time.strftime('%I:%M %p %Z')} {days} days rep logs"
+                        profile_subreddit = comment._reddit.subreddit(f"u_{os.getenv('reddit_username')}")
+                        submission = profile_subreddit.submit(title=title, selftext=table)
+                        comment.author.message(title, "https://www.reddit.com{}".format(submission.permalink))
             except AttributeError:
-                print("EEEEEEEEEEEEEEEEE")
+                comment.author.message(f"Replogs {author_name}", f"No Redditor exists with username {author_name}.")
