@@ -1,9 +1,12 @@
+import csv
+import io
 import json
 import os
 import platform
 import time
 import traceback
 from contextlib import closing
+from datetime import datetime
 from pprint import pprint
 from threading import Thread, Lock
 
@@ -16,13 +19,14 @@ import schedule
 import rep_manager
 
 
-def send_message_to_discord(msg):
+def send_message_to_discord(msg, webhook):
     """
     Sends the message to discord channel via webhook url.
+    :param webhook: URL of channel webhook where the message will be posted.
     :param msg: message content.
     """
     data = {"content": msg, "username": "Karma Bot"}
-    output = requests.post(os.getenv('error_msg_channel'), data=json.dumps(data), headers={"Content-Type": "application/json"})
+    output = requests.post(os.getenv(webhook), data=json.dumps(data), headers={"Content-Type": "application/json"})
     try:
         output.raise_for_status()
     except requests.HTTPError:
@@ -36,7 +40,7 @@ def catch_exceptions(job_func):
             job_func(*args, **kwargs)
             failed_attempt = 1
         except Exception as exp:
-            send_message_to_discord(traceback.format_exc())
+            send_message_to_discord(traceback.format_exc(), 'error_msg_channel')
             # In case of server error pause for multiple of 5 minutes
             if isinstance(exp, (prawcore.exceptions.ServerError, prawcore.exceptions.RequestException)):
                 print(f"Waiting {(300 * failed_attempt) / 60} minutes...")
@@ -63,6 +67,27 @@ def delete_old_rep_transactions():
             with closing(db_conn.cursor()) as cursor:
                 cursor.execute(f"DELETE FROM rep_transactions WHERE submission_created_utc <= '{int(unix_time_six_months_ago)}'")
             db_conn.commit()
+
+    with mutex:
+        with closing(psycopg2.connect(os.getenv('DATABASE_URL'), sslmode='require')) as db_conn:
+            with closing(db_conn.cursor()) as cursor:
+                cursor.execute(f"SELECT * FROM rep_transactions WHERE comment_created_utc >= '{int(time.time() - 86400)}'")
+                results = cursor.fetchall()
+                with closing(io.StringIO()) as str_buffer:
+                    csv_writer = csv.writer(str_buffer)
+                    for row in results:
+                        csv_writer.writerow(row)
+
+                    # Logging into Reddit
+                    reddit = praw.Reddit(client_id=os.getenv("client_id"),
+                                         client_secret=os.getenv("client_secret"),
+                                         username=os.getenv("reddit_username"),
+                                         password=os.getenv("reddit_password"),
+                                         user_agent=f"{platform.platform()}:MarketMM2Rep:1.0 (by u/is_fake_Account)")
+                    reddit.validate_on_submit = True
+                    profile_subreddit = reddit.subreddit(f"u_{os.getenv('reddit_username')}")
+                    submission = profile_subreddit.submit(title=f"Rep Logs {datetime.now().isoformat()}", selftext=str_buffer.getvalue())
+                    send_message_to_discord(f"Rep logs for the day https://www.reddit.com{submission.permalink}", 'rep_updates_channel')
 
 
 def db_manager_thread():
